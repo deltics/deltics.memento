@@ -1,0 +1,23 @@
+{
+  "id":"deltics.memento",
+  "version":"",
+  "summary":"A package that provides a base class for implementing memento objects to manage scoped state.",
+  "tags":[
+    "deltics",
+    "memento"
+  ],
+  "copyright":"\u00A92020 Jolyon Direnko-Smith",
+  "language":"en",
+  "content":"source",
+  "dependencies":[
+    "deltics.inc:1.0.4",
+    "deltics.exceptions:1.1.0",
+    "deltics.interfacedobjects:1.0.0"
+  ],
+  "source":{
+      "files":[
+        "src\\deltics.memento.inc",
+        "src\\Deltics.Memento.pas"
+      ]
+    }
+}

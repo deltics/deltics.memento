@@ -1,53 +1,85 @@
-# New in 1.03
+# Deltics.Memento
 
-* Support for Delphi 10.4
+This packages provides a base class for implementing auto-disposed objects that can be used to
+recall some state that is useful to an application or framework.  The base implementation provides
+no state persistence or recall of it's own.  This must be provided by applications or frameworks
+deriving their own classes to add the required state and override the `DoRecall` method to re-apply
+that stored state as required.
 
 
-# Introduction 
-This library is very small and very simple.  It is a simple include file which provides a set of `$define` symbols based on the Delphi version at compilation time to help with development of code that needs to support and adapt to multiple versions of Delphi.
+The canonical example is a StreamPositionMemento (see: Deltics.Streams) which records the Position
+of a specific stream at initialisation and then restores the position when recalled.  This memento
+can then be used in code which wish to read from a stream but ensure that the stream Position is
+restored to the original value once complete.
 
-Specific Delphi versions may be detected by testing for a `$define` corresponding to each version:
+```
+  var
+    orgPos: IMemento;
+  begin
+    orgPos := TStreamPositionMemento.Create(aStream);
 
-    Delphi 1 thru 7	          : DELPHI1, DELPHI2, DELPHI3 .. DELPHI7
-    Delphi 8 is not supported
-    Delphi 2005 thru 2010      : DELPHI2005, DELPHI2006, DELPHI2007, DELPHI2009, DELPHI2010
-                                 (For Delphi 2006 and 2007, DELPHI2006_OR_2007 is also defined)
-    Delphi XE thru XE8         : DELPHIXE, DELPHIXE2 .. DELPHIXE8
-    Delphi 10 thru 10.n        : DELPHI10, DELPHI10_1 .. DELPHI10_n
-                                 (city names are also defined: SEATTLE, BERLIN, TOKYO, RIO etc)
+    // Some processing of the stream
+  end;
+```
 
-So, for code that should only be compiled when compiling with Delphi 2010, you can write:
+Upon completion of the above method, the orgPos memento falls out of scope and is automatically
+destroyed, causing the memento to be recalled, which in this case will reset the Position property
+of aStream to the value it had when the memento was created.
 
-    {$ifdef DELPHI2010}
-      ..
-    {$endif}
+If the state held by a memento should not be recalled in some circumstances then it should be
+discarded:
 
-Knowing that you are compiling with a specific Delphi version is less useful than knowing that the compiler is some version _in a range of versions_.  In particular, changes in RTL functions are usually introduced at some point and then remain consistent from that point on, or are removed from some given version.  To assist with such cases, additional `$define` symbols are provided to allow you to test for versions up to and including or later than some version of interest.  These use pre and post-fix double-underscores (`__`) respectively.
+```
+  var
+    orgPos: IMemento;
+  begin
+    orgPos := TStreamPositionMemento.Create(aStream);
 
-e.g. for code that relies on compilation with any version of Delphi upto and including Delphi 2007:
+    // Some processing of the stream
 
-    {$ifdef __DELPHI2007}
-      ..
-    {$endif}
+    if someCondition then
+      orgPos.Discard;
+  end;
+```
 
-Similarly, for code that relies on Delphi 2009 or later:
+Similarly, if the state held by a memento should be recalled explicitly, before the memento is
+destroyed, then it may be explicitly recalled:
 
-    {$ifdef DELPHI2009__}
-      ..
-    {$endif}
+```
+  var
+    orgPos: IMemento;
+  begin
+    orgPos := TStreamPositionMemento.Create(aStream);
 
-# City Names for Delphi Versions 10 and Later
+    // Some processing of the stream
 
-As well as the DELPHI10 or DELPHI10_x `$define`s, the corresponding city name symbols are defined for these versions:
+    if someCondition then
+      orgPos.Recall;
+  end;
+```
 
-      DELPHI10    ==    SEATTLE
-    __DELPHI10    ==  __SEATTLE 
-      DELPHI10__  ==    SEATTLE__
+If at any point a memento needs to be refreshed, to update its state, then Refresh may be called
+explicitly.  Refreshing a memento resets any Discarded or previously Recalled state (the refreshed
+state in the memento may be [again] Discarded or Recalled).
 
-etc
 
-# Getting Started - Duget Package
-To use this library simply add a `deltics.inc` reference in your project .duget file and run `duget update` to obtain the latest version available in any of your feeds (duget.org is recommended).
+## Invalid Operations
+The following will cause an EInvalidOperation exception at runtime:
 
-# Build and Test
-The build pipeline for this package compiles a set of tests with every version of Delphi from version 2 onward.  These tests use [Smoketest 2.x](https://github.com/deltics/deltics.smoketest) to exercise the compiler defines introduced by the include file and compare them with the expected results based on the version of Delphi used to compile each set of tests.
+* Attempting to explicitly Recall a discarded memento
+* Attempting to explicitly Recall a memento that has already been recalled
+
+
+## Implementing a Memento Class
+
+Three fundamentals are required when implementing a memento:
+
+1. A constructor (and any required class member variables) to retain references that will be
+   required to obtain and re-apply the state of interest.  e.g. the in the case of
+   TStreamPositionMemento, a reference to the stream and a variable to hold the current value of
+   the stream Position property (to be applied when recalled);
+
+2. Override the DoRefresh protected method to capture the state of interest.  This method is called
+   after the constructor.  Additionally capturing state in the constructor is unnecessary;
+
+3. Override the DoRecall protected method to re-apply the captured state.
